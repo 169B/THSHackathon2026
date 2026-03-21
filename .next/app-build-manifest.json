@@ -14,6 +14,11 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/predict/route.js"
+    ],
+    "/api/analyze-rubric/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/analyze-rubric/route.js"
     ]
   }
 }

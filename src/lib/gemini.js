@@ -39,7 +39,7 @@ export async function callGemini(apiKey, prompt, { temperature = 0.3, maxOutputT
     throw err;
   }
 
-  // 2.5-flash returns thinking parts (thought=true) before the answer — skip them
+  // 2.5-flash returns thinking parts (thought=true) before the answer - skip them
   const parts = candidate.content.parts;
   const answerParts = parts.filter(p => !p.thought);
   const text = (answerParts.length ? answerParts : parts).map(p => p.text || '').join('');
