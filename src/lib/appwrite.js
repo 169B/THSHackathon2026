@@ -12,6 +12,20 @@ const PROFILES_COLLECTION_ID = 'profiles';
 const TASKS_COLLECTION_ID = 'tasks';
 const PREDICTIONS_COLLECTION_ID = 'predictions';
 
+// Cache user ID to avoid redundant account.get() calls
+let cachedUserId = null;
+
+async function getUserId() {
+  if (cachedUserId) return cachedUserId;
+  const user = await account.get();
+  cachedUserId = user.$id;
+  return cachedUserId;
+}
+
+function clearUserCache() {
+  cachedUserId = null;
+}
+
 // ──────────────────────────────────────────────
 // AUTH
 // ──────────────────────────────────────────────
@@ -19,6 +33,7 @@ const PREDICTIONS_COLLECTION_ID = 'predictions';
 export async function signup(email, password, name = '') {
   const user = await account.create(ID.unique(), email, password, name || undefined);
   await account.createEmailPasswordSession(email, password);
+  cachedUserId = user.$id;
   await databases.createDocument(DATABASE_ID, PROFILES_COLLECTION_ID, ID.unique(), {
     userId: user.$id,
     name: name || '',
@@ -28,10 +43,13 @@ export async function signup(email, password, name = '') {
 }
 
 export async function login(email, password) {
-  return await account.createEmailPasswordSession(email, password);
+  const session = await account.createEmailPasswordSession(email, password);
+  cachedUserId = null; // will be fetched on next getUserId()
+  return session;
 }
 
 export async function logout() {
+  clearUserCache();
   return await account.deleteSession('current');
 }
 
@@ -40,9 +58,9 @@ export async function getCurrentUser() {
 }
 
 export async function getUserProfile() {
-  const user = await account.get();
+  const userId = await getUserId();
   const result = await databases.listDocuments(DATABASE_ID, PROFILES_COLLECTION_ID, [
-    Query.equal('userId', user.$id),
+    Query.equal('userId', userId),
   ]);
   return result.documents[0] || null;
 }
@@ -61,47 +79,38 @@ export async function addTask({
   title,
   description = '',
   class_type = 'math',
-  task_type = 'problem',    // 'writing' or 'problem'
-  difficulty = 3,           // 1-5
-  complexity = 3,           // 1-5 (same scale)
-  motivation = 50,          // 0-100
-  estimated_length = 60,    // user estimate in minutes
-  set_size = 0,             // for problem tasks: number of problems
-  status = 'pending',       // pending | in-progress | done
-  actual_time = 0,          // filled in post-task
-  post_motivation = 0,      // filled in post-task reflection
+  task_type = 'problem',
+  difficulty = 3,
+  complexity = 3,
+  motivation = 50,
+  estimated_length = 60,
+  set_size = 0,
+  status = 'pending',
+  actual_time = 0,
+  post_motivation = 0,
 }) {
-  const user = await account.get();
+  const userId = await getUserId();
   return await databases.createDocument(DATABASE_ID, TASKS_COLLECTION_ID, ID.unique(), {
-    userId: user.$id,
-    title,
-    description,
-    class_type,
-    task_type,
-    difficulty,
-    complexity,
-    motivation,
-    estimated_length,
-    set_size,
-    status,
-    actual_time,
-    post_motivation,
+    userId,
+    title, description, class_type, task_type,
+    difficulty, complexity, motivation, estimated_length,
+    set_size, status, actual_time, post_motivation,
   });
 }
 
 export async function getTasks() {
-  const user = await account.get();
+  const userId = await getUserId();
   const result = await databases.listDocuments(DATABASE_ID, TASKS_COLLECTION_ID, [
-    Query.equal('userId', user.$id),
+    Query.equal('userId', userId),
     Query.orderDesc('$createdAt'),
   ]);
   return result.documents;
 }
 
 export async function getCompletedTasks() {
-  const user = await account.get();
+  const userId = await getUserId();
   const result = await databases.listDocuments(DATABASE_ID, TASKS_COLLECTION_ID, [
-    Query.equal('userId', user.$id),
+    Query.equal('userId', userId),
     Query.equal('status', 'done'),
   ]);
   return result.documents;
@@ -120,9 +129,9 @@ export async function deleteTask(taskId) {
 // ──────────────────────────────────────────────
 
 export async function savePrediction(taskId, prediction) {
-  const user = await account.get();
+  const userId = await getUserId();
   return await databases.createDocument(DATABASE_ID, PREDICTIONS_COLLECTION_ID, ID.unique(), {
-    userId: user.$id,
+    userId,
     taskId,
     predicted_minutes: prediction.predicted_minutes,
     confidence: prediction.confidence,
@@ -132,9 +141,9 @@ export async function savePrediction(taskId, prediction) {
 }
 
 export async function getPrediction(taskId) {
-  const user = await account.get();
+  const userId = await getUserId();
   const result = await databases.listDocuments(DATABASE_ID, PREDICTIONS_COLLECTION_ID, [
-    Query.equal('userId', user.$id),
+    Query.equal('userId', userId),
     Query.equal('taskId', taskId),
   ]);
   return result.documents[0] || null;

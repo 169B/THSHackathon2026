@@ -5,21 +5,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/layout.js"
     ],
-    "/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/page.css",
-      "static/chunks/app/page.js"
-    ],
     "/tasks/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/tasks/page.js"
     ],
-    "/api/analyze-rubric/route": [
+    "/api/predict/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/analyze-rubric/route.js"
+      "static/chunks/app/api/predict/route.js"
     ]
   }
 }

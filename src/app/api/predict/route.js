@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { callGemini } from '@/lib/gemini';
 
 export async function POST(request) {
   const { task, completedTasks, mode } = await request.json();
@@ -116,38 +117,10 @@ Rules for predicted_minutes:
   }
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 500,
-          },
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      const errText = await res.text();
-      return NextResponse.json({ error: `Gemini API error: ${res.status}`, details: errText }, { status: 502 });
-    }
-
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    // Parse the JSON from Gemini's response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return NextResponse.json({ error: 'Could not parse AI response', raw: text }, { status: 500 });
-    }
-
-    const prediction = JSON.parse(jsonMatch[0]);
+    const prediction = await callGemini(apiKey, prompt, { temperature: 0.3 });
     return NextResponse.json(prediction);
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const status = err.status || 500;
+    return NextResponse.json({ error: err.message }, { status });
   }
 }

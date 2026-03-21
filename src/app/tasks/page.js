@@ -7,10 +7,146 @@ import {
   predictTask, savePrediction,
 } from "@/lib/appwrite";
 
+const APP_VERSION = "v1.5";
+
+function StatsTab({ tasks, completedTasks, s }) {
+  const now = new Date();
+  const weekAgo = new Date(now);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+
+  const allTasks = [...tasks, ...completedTasks];
+  // Deduplicate by $id (tasks and completedTasks may overlap)
+  const seen = new Set();
+  const unique = allTasks.filter(t => { if (seen.has(t.$id)) return false; seen.add(t.$id); return true; });
+
+  const weekTasks = unique.filter(t => new Date(t.$createdAt) >= weekAgo);
+  const weekDone = weekTasks.filter(t => t.status === 'done');
+  const allDone = unique.filter(t => t.status === 'done');
+
+  // Weekly stats
+  const weekHoursPredicted = weekTasks.reduce((sum, t) => sum + (t.estimated_length || 0), 0) / 60;
+  const weekHoursActual = weekDone.reduce((sum, t) => sum + (t.actual_time || 0), 0) / 60;
+  const weekTasksDone = weekDone.length;
+  const weekAvgMotivation = weekTasks.length > 0
+    ? Math.round(weekTasks.reduce((sum, t) => sum + (t.motivation || 0), 0) / weekTasks.length)
+    : 0;
+
+  // Lifetime stats
+  const totalHoursPredicted = unique.reduce((sum, t) => sum + (t.estimated_length || 0), 0) / 60;
+  const totalHoursActual = allDone.reduce((sum, t) => sum + (t.actual_time || 0), 0) / 60;
+  const totalTasksDone = allDone.length;
+  const totalAvgMotivation = unique.length > 0
+    ? Math.round(unique.reduce((sum, t) => sum + (t.motivation || 0), 0) / unique.length)
+    : 0;
+
+  // Recent activity (last 10 completed, newest first)
+  const recentDone = [...allDone]
+    .sort((a, b) => new Date(b.$updatedAt || b.$createdAt) - new Date(a.$updatedAt || a.$createdAt))
+    .slice(0, 10);
+
+  // Subject breakdown
+  const subjectMap = {};
+  allDone.forEach(t => {
+    const c = t.class_type || 'other';
+    if (!subjectMap[c]) subjectMap[c] = { count: 0, totalMin: 0 };
+    subjectMap[c].count++;
+    subjectMap[c].totalMin += (t.actual_time || 0);
+  });
+
+  const statCard = (value, label, sub, color = "#4f46e5") => (
+    <div style={{ textAlign: "center", padding: "1rem", background: "#fff", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+      <div style={{ fontSize: "2rem", fontWeight: "bold", color }}>{value}</div>
+      <div style={{ fontSize: "0.8rem", color: "#666", marginTop: "0.25rem" }}>{label}</div>
+      {sub && <div style={{ fontSize: "0.7rem", color: "#999" }}>{sub}</div>}
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Weekly Stats */}
+      <h3 style={{ marginBottom: "0.75rem" }}>Weekly Stats</h3>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0.75rem", marginBottom: "1.5rem" }}>
+        {statCard(weekHoursPredicted.toFixed(1), "Hours Predicted", `${weekTasks.length} tasks`, "#4f46e5")}
+        {statCard(weekHoursActual.toFixed(1), "Hours Actual", `${weekTasksDone} done`, "#10b981")}
+        {statCard(weekTasksDone, "Tasks Completed", "this week", "#f59e0b")}
+        {statCard(weekAvgMotivation || "—", "Avg Motivation", weekTasks.length > 0 ? `out of 100` : "", "#8b5cf6")}
+      </div>
+
+      {/* Weekly Summary */}
+      {weekDone.length > 0 && (
+        <div style={{ ...s.section, background: "#f0fdf4", borderColor: "#86efac", marginBottom: "1.5rem" }}>
+          <h4 style={{ margin: "0 0 0.5rem", color: "#166534" }}>Summary</h4>
+          <p style={{ margin: 0, fontSize: "0.9rem", color: "#333" }}>
+            You completed <strong>{weekTasksDone}</strong> task{weekTasksDone !== 1 ? 's' : ''} this week,
+            spending <strong>{weekHoursActual.toFixed(1)}h</strong> actual
+            vs <strong>{weekHoursPredicted.toFixed(1)}h</strong> predicted.
+            {weekHoursActual < weekHoursPredicted
+              ? ` You were ${Math.round((1 - weekHoursActual / weekHoursPredicted) * 100)}% faster than predicted! 🚀`
+              : weekHoursActual > weekHoursPredicted
+                ? ` Tasks took ${Math.round((weekHoursActual / weekHoursPredicted - 1) * 100)}% longer than predicted.`
+                : ''}
+          </p>
+        </div>
+      )}
+
+      {/* Lifetime Stats */}
+      <h3 style={{ marginBottom: "0.75rem" }}>Lifetime Stats</h3>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0.75rem", marginBottom: "1.5rem" }}>
+        {statCard(totalHoursPredicted.toFixed(1), "Hours Predicted", `${unique.length} tasks total`, "#4f46e5")}
+        {statCard(totalHoursActual.toFixed(1), "Hours Actual", `${totalTasksDone} completed`, "#10b981")}
+        {statCard(totalTasksDone, "Tasks Completed", "all time", "#f59e0b")}
+        {statCard(totalAvgMotivation || "—", "Avg Motivation", unique.length > 0 ? "out of 100" : "", "#8b5cf6")}
+      </div>
+
+      {/* Subject Breakdown */}
+      {Object.keys(subjectMap).length > 0 && (
+        <div style={{ ...s.section, marginBottom: "1.5rem" }}>
+          <h4 style={{ margin: "0 0 0.75rem" }}>By Subject</h4>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+            {Object.entries(subjectMap).map(([subject, data]) => (
+              <div key={subject} style={{ padding: "0.5rem 1rem", background: "#f5f3ff", borderRadius: "8px", border: "1px solid #ddd6fe", fontSize: "0.85rem" }}>
+                <strong style={{ textTransform: "capitalize" }}>{subject}</strong>
+                <div style={{ color: "#666", fontSize: "0.75rem" }}>{data.count} task{data.count !== 1 ? 's' : ''} · {Math.round(data.totalMin / 60 * 10) / 10}h</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent Activity */}
+      <h3 style={{ marginBottom: "0.75rem" }}>Recent Activity</h3>
+      {recentDone.length === 0 ? (
+        <p style={{ color: "#999" }}>Start creating tasks to track progress.</p>
+      ) : (
+        recentDone.map(t => (
+          <div key={t.$id} style={{ ...s.card, borderLeft: "4px solid #10b981" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <strong>{t.title}</strong>
+                <div style={{ fontSize: "0.75rem", color: "#666" }}>
+                  {new Date(t.$updatedAt || t.$createdAt).toLocaleDateString()} · <span style={{ textTransform: "capitalize" }}>{t.class_type}</span>
+                </div>
+              </div>
+              <div style={{ textAlign: "right", fontSize: "0.85rem" }}>
+                {t.actual_time > 0 && (
+                  <div style={{ color: "#10b981", fontWeight: 600 }}>{t.actual_time}m actual</div>
+                )}
+                <div style={{ color: "#999", fontSize: "0.75rem" }}>Est: {t.estimated_length}m</div>
+              </div>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 export default function TasksPage() {
   const [user, setUser] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [message, setMessage] = useState("");
+  const [activeTab, setActiveTab] = useState("tasks"); // "tasks" | "stats"
+  const [completedTasks, setCompletedTasks] = useState([]);
 
   // Login
   const [email, setEmail] = useState("");
@@ -36,7 +172,8 @@ export default function TasksPage() {
 
   // Prediction result
   const [prediction, setPrediction] = useState(null);
-  const [predMode, setPredMode] = useState('ai'); // 'ai' = full AI prediction, 'formula' = formula + AI avg only
+  const [predMode, setPredMode] = useState('ai');
+  const [submitting, setSubmitting] = useState(false);
 
   // Post-task modal
   const [loggingTask, setLoggingTask] = useState(null);
@@ -45,8 +182,8 @@ export default function TasksPage() {
 
   useEffect(() => {
     getCurrentUser()
-      .then((me) => { setUser(me); return getTasks(); })
-      .then(setTasks)
+      .then((me) => { setUser(me); return Promise.all([getTasks(), getCompletedTasks()]); })
+      .then(([t, c]) => { setTasks(t); setCompletedTasks(c); })
       .catch(() => {});
   }, []);
 
@@ -57,6 +194,7 @@ export default function TasksPage() {
       const me = await getCurrentUser();
       setUser(me);
       setTasks(await getTasks());
+      setCompletedTasks(await getCompletedTasks());
       setMessage(`Logged in as ${me.name}`);
     } catch (err) { setMessage(`Error: ${err.message}`); }
   }
@@ -79,7 +217,9 @@ export default function TasksPage() {
         form.append('file', rubricFile);
       }
       const res = await fetch('/api/analyze-rubric', { method: 'POST', body: form });
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { throw new Error('Server returned invalid response'); }
       if (data.error) throw new Error(data.error);
       setRubricResult(data);
       // Auto-fill form fields from AI analysis
@@ -98,6 +238,8 @@ export default function TasksPage() {
 
   async function handleAddTask(e) {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const taskData = {
         title,
@@ -138,8 +280,10 @@ export default function TasksPage() {
       // Reset form
       setTitle(""); setDescription(""); setMotivation(50);
       setTasks(await getTasks());
+      setCompletedTasks(await getCompletedTasks());
       setMessage("Task added with prediction!");
     } catch (err) { setMessage(`Error: ${err.message}`); }
+    setSubmitting(false);
   }
 
   async function handleToggleStatus(task) {
@@ -167,6 +311,7 @@ export default function TasksPage() {
       });
       setLoggingTask(null);
       setTasks(await getTasks());
+      setCompletedTasks(await getCompletedTasks());
       setMessage("Task completed & logged!");
     } catch (err) { setMessage(`Error: ${err.message}`); }
   }
@@ -227,15 +372,27 @@ export default function TasksPage() {
   return (
     <div style={s.page}>
       {/* Header */}
-      <div style={{ ...s.row, justifyContent: "space-between", marginBottom: "1.5rem" }}>
-        <h1 style={{ margin: 0 }}>Task Planner</h1>
+      <div style={{ ...s.row, justifyContent: "space-between", marginBottom: "1rem" }}>
+        <h1 style={{ margin: 0 }}>Task Planner <span style={{ fontSize: "0.5em", color: "#999" }}>{APP_VERSION}</span></h1>
         <div style={s.row}>
           <span style={{ color: "#666" }}>{user.name}</span>
           <button onClick={handleLogout} style={s.btn("#999")}>Log Out</button>
         </div>
       </div>
 
+      {/* Tab Bar */}
+      <div style={{ display: "flex", gap: "0", marginBottom: "1.5rem", borderBottom: "2px solid #e5e7eb" }}>
+        {[["tasks", "Tasks"], ["stats", "Activity"]].map(([key, label]) => (
+          <button key={key} onClick={() => setActiveTab(key)} style={{
+            padding: "0.6rem 1.5rem", border: "none", borderBottom: activeTab === key ? "2px solid #4f46e5" : "2px solid transparent",
+            background: "none", color: activeTab === key ? "#4f46e5" : "#666", fontWeight: activeTab === key ? 600 : 400,
+            fontSize: "0.95rem", cursor: "pointer", marginBottom: "-2px",
+          }}>{label}</button>
+        ))}
+      </div>
+
       {/* ── Add Task Form ── */}
+      {activeTab === "tasks" && (<>
       <form onSubmit={handleAddTask} style={{ ...s.section, background: "#fafafa" }}>
         <h3 style={{ margin: "0 0 0.75rem" }}>New Task</h3>
 
@@ -341,7 +498,7 @@ export default function TasksPage() {
           <input type="number" value={daysUntilDue} onChange={(e) => setDaysUntilDue(e.target.value)} min={1} style={{ ...s.input, maxWidth: "200px" }} />
         </div>
 
-        <button type="submit" style={s.btn("#FD366E")}>Add Task & Get Prediction</button>
+        <button type="submit" disabled={submitting} style={s.btn(submitting ? '#999' : '#FD366E')}>{submitting ? 'Adding...' : 'Add Task & Get Prediction'}</button>
 
         {/* Prediction Mode Toggle */}
         <div style={{ marginTop: "0.75rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -497,6 +654,10 @@ export default function TasksPage() {
           </div>
         ))
       )}
+      </>)}
+
+      {/* ── Activity / Stats Tab ── */}
+      {activeTab === "stats" && (<StatsTab tasks={tasks} completedTasks={completedTasks} s={s} />)}
 
       {/* ── Post-Task Logger Modal ── */}
       {loggingTask && (

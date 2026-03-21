@@ -1,46 +1,58 @@
 import { NextResponse } from 'next/server';
 import mammoth from 'mammoth';
+import { callGemini } from '@/lib/gemini';
 
 export async function POST(request) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 500 });
-  }
-
-  const formData = await request.formData();
-  const file = formData.get('file');
-  const pastedText = formData.get('text');
-  const classType = formData.get('class_type') || 'general';
-  const taskType = formData.get('task_type') || 'writing';
-
-  let rubricText = '';
-
-  if (pastedText) {
-    rubricText = pastedText;
-  } else if (file) {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const name = file.name.toLowerCase();
-
-    if (name.endsWith('.pdf')) {
-      const pdf = (await import('pdf-parse')).default;
-      const data = await pdf(buffer);
-      rubricText = data.text;
-    } else if (name.endsWith('.docx')) {
-      const result = await mammoth.extractRawText({ buffer });
-      rubricText = result.value;
-    } else {
-      return NextResponse.json({ error: 'Unsupported file type. Use PDF or DOCX.' }, { status: 400 });
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 500 });
     }
-  } else {
-    return NextResponse.json({ error: 'No file or text provided' }, { status: 400 });
-  }
 
-  // Truncate to avoid hitting token limits
-  if (rubricText.length > 8000) {
-    rubricText = rubricText.substring(0, 8000);
-  }
+    let formData;
+    try {
+      formData = await request.formData();
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid form data: ' + e.message }, { status: 400 });
+    }
 
-  const prompt = `You are an academic task analyzer. Analyze this rubric/assignment description and determine the complexity and difficulty for a student.
+    const file = formData.get('file');
+    const pastedText = formData.get('text');
+    const classType = formData.get('class_type') || 'general';
+    const taskType = formData.get('task_type') || 'writing';
+
+    let rubricText = '';
+
+    if (pastedText) {
+      rubricText = pastedText;
+    } else if (file) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const name = file.name.toLowerCase();
+
+      if (name.endsWith('.pdf')) {
+        let pdf;
+        try {
+          pdf = (await import('pdf-parse/lib/pdf-parse.js')).default;
+        } catch (e) {
+          return NextResponse.json({ error: 'PDF parsing is not available: ' + e.message }, { status: 500 });
+        }
+        const data = await pdf(buffer);
+        rubricText = data.text;
+      } else if (name.endsWith('.docx')) {
+        const result = await mammoth.extractRawText({ buffer });
+        rubricText = result.value;
+      } else {
+        return NextResponse.json({ error: 'Unsupported file type. Use PDF or DOCX.' }, { status: 400 });
+      }
+    } else {
+      return NextResponse.json({ error: 'No file or text provided' }, { status: 400 });
+    }
+
+    if (rubricText.length > 8000) {
+      rubricText = rubricText.substring(0, 8000);
+    }
+
+    const prompt = `You are an academic task analyzer. Analyze this rubric/assignment description and determine the complexity and difficulty for a student.
 
 SUBJECT: ${classType}
 TASK TYPE: ${taskType}
@@ -67,34 +79,10 @@ Rules:
 - For problem sets: count distinct problems/questions
 - Be realistic about student time estimates`;
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 500 },
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      const errText = await res.text();
-      return NextResponse.json({ error: `Gemini API error: ${res.status}`, details: errText }, { status: 502 });
-    }
-
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return NextResponse.json({ error: 'Could not parse AI response', raw: text }, { status: 500 });
-    }
-
-    const analysis = JSON.parse(jsonMatch[0]);
+    const analysis = await callGemini(apiKey, prompt, { temperature: 0.2 });
     return NextResponse.json(analysis);
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    const status = err.status || 500;
+    return NextResponse.json({ error: err.message }, { status });
   }
 }
