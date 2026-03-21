@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none" role="img" aria-label="Estimately logo">
+  <g stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M98 66a34 34 0 1 1-8-42"/>
+    <path d="M88 24h13v13"/>
+
+    <path d="M48 42h32"/>
+    <path d="M48 86h32"/>
+    <path d="M52 42v8c0 7 5 11 12 14 7-3 12-7 12-14v-8"/>
+    <path d="M52 86v-8c0-7 5-11 12-14 7 3 12 7 12 14v8"/>
+    <path d="M59 75h10"/>
+  </g>
+
+  <g fill="#ffffff" opacity="0.9">
+    <circle cx="17" cy="14" r="1.4"/>
+    <circle cx="30" cy="8" r="1.2"/>
+    <circle cx="112" cy="22" r="1.2"/>
+    <circle cx="106" cy="40" r="1.1"/>
+    <circle cx="14" cy="100" r="1.1"/>
+    <circle cx="26" cy="112" r="1.2"/>
+    <circle cx="104" cy="104" r="1.1"/>
+    <circle cx="114" cy="114" r="1.2"/>
+  </g>
+</svg>

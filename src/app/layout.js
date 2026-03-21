@@ -77,7 +77,7 @@ export default function RootLayout({ children }) {
                     "body": ["Inter"],
                     "label": ["Inter"]
                   },
-                  borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                  borderRadius: {"DEFAULT": "0.5rem", "lg": "0.875rem", "xl": "1rem", "full": "9999px"},
                 },
               },
             }
