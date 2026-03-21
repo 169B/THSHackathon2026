@@ -8,7 +8,7 @@ Kickstart your Next.js development with this ready-to-use starter project integr
 Clone the Project
 Clone this repository to your local machine using Git:
 
-`git clone https://github.com/appwrite/starter-for-nextjs`
+`git clone https://github.com/169B/THSHackathon2026.git`
 
 ## 🛠️ Development guid
 1. **Configure Appwrite**<br/>

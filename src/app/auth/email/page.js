@@ -1,25 +1,21 @@
-﻿"use client";
+"use client";
 
+import TopNavBar from "@/components/TopNavBar";
+import Footer from "@/components/Footer";
 import { useState } from "react";
 
-export default function EmailPage() {
+export default function EmailEntryPage() {
   const [email, setEmail] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log("Email submitted:", email);
+    // Handle email submission logic here
   };
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* TopNavBar */}
-      <header className="z-50 w-full bg-[#111411] font-['Manrope'] text-sm tracking-wide antialiased">
-        <div className="flex w-full max-w-none items-center justify-between px-12 py-6">
-          <div className="text-2xl font-bold tracking-tighter text-[#b4cdb8]">
-            Estimately
-          </div>
-        </div>
-      </header>
+      <TopNavBar />
 
       {/* Main Content Area */}
       <main className="relative flex flex-grow items-center justify-center overflow-hidden px-6">
@@ -37,7 +33,12 @@ export default function EmailPage() {
 
           {/* Focus Card */}
           <div className="relative rounded-xl border border-outline-variant/15 bg-surface-container-low p-8 shadow-2xl">
-
+            {/* Decorative Accent */}
+            <div className="absolute top-0 right-0 p-4 opacity-20">
+              <span className="material-symbols-outlined text-4xl text-primary">
+                forest
+              </span>
+            </div>
 
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="space-y-2">
@@ -51,7 +52,7 @@ export default function EmailPage() {
                   <input
                     className="w-full rounded-lg border border-outline-variant/20 bg-surface-container-highest px-4 py-4 font-body text-on-surface placeholder:text-on-surface-variant/40 transition-all duration-300 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     id="email"
-                    placeholder="name@school.edu"
+                    placeholder="name@company.com"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -72,7 +73,7 @@ export default function EmailPage() {
                 New to Estimately?
                 <a
                   className="ml-1 font-semibold text-on-secondary-container transition-colors duration-200 hover:text-secondary"
-                    href="/signup"
+                  href="/auth/signup"
                 >
                   Sign up
                 </a>
@@ -80,9 +81,18 @@ export default function EmailPage() {
             </div>
           </div>
 
-
+          {/* Footer-esque Microcopy for focused view */}
+          <div className="mt-12 flex items-center justify-center gap-6 opacity-40">
+            <div className="h-[1px] w-8 bg-outline-variant"></div>
+            <span className="material-symbols-outlined text-on-surface">
+              energy_savings_leaf
+            </span>
+            <div className="h-[1px] w-8 bg-outline-variant"></div>
+          </div>
         </section>
       </main>
+
+      <Footer />
     </div>
   );
 }
