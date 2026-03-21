@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 export default function PasswordPage() {
@@ -63,12 +64,12 @@ export default function PasswordPage() {
                       {email}
                     </span>
                   </div>
-                  <a
+                  <Link
                     className="text-xs font-semibold text-primary transition-colors hover:text-on-surface"
                     href="/"
                   >
                     Change
-                  </a>
+                  </Link>
                 </div>
               </div>
 

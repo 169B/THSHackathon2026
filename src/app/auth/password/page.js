@@ -1,18 +1,48 @@
 "use client";
 
+import Link from "next/link";
 import TopNavBar from "@/components/TopNavBar";
-import Footer from "@/components/Footer";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function PasswordEntryPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [email] = useState("architect@temporal.com");
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    const stored = sessionStorage.getItem("auth_email") ?? "";
+    if (!stored) {
+      router.push("/auth/email");
+      return;
+    }
+    setEmail(stored);
+  }, [router]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Sign in with password:", password);
-    // Handle sign in logic here
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "signin", email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Sign in failed");
+      // Persist session info and redirect to dashboard
+      sessionStorage.setItem("session_id", data.sessionId);
+      sessionStorage.setItem("user_id", data.userId);
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -50,6 +80,12 @@ export default function PasswordEntryPage() {
               </p>
             </header>
 
+            {error && (
+              <div className="mb-6 rounded-lg bg-error-container/20 px-4 py-3 text-sm text-error">
+                {error}
+              </div>
+            )}
+
             <form className="space-y-8" onSubmit={handleSubmit}>
               {/* Read-only Email Field */}
               <div className="space-y-2">
@@ -65,12 +101,12 @@ export default function PasswordEntryPage() {
                       {email}
                     </span>
                   </div>
-                  <a
+                  <Link
                     className="text-xs font-semibold text-primary transition-colors hover:text-on-surface"
                     href="/auth/email"
                   >
                     Change
-                  </a>
+                  </Link>
                 </div>
               </div>
 
@@ -83,12 +119,12 @@ export default function PasswordEntryPage() {
                   >
                     Password
                   </label>
-                  <a
+                  <Link
                     className="text-[10px] font-bold uppercase tracking-widest text-secondary transition-colors hover:text-on-secondary-container"
                     href="/auth/reset-password"
                   >
                     Forgot password?
-                  </a>
+                  </Link>
                 </div>
                 <div className="group relative">
                   <input
@@ -115,21 +151,22 @@ export default function PasswordEntryPage() {
               {/* Actions */}
               <div className="space-y-6 pt-4">
                 <button
-                  className="w-full rounded-lg bg-gradient-to-br from-primary to-primary-container py-4 font-bold text-on-primary shadow-lg shadow-primary/10 transition-all duration-200 active:scale-[0.98] hover:brightness-110"
+                  className="w-full rounded-lg bg-gradient-to-br from-primary to-primary-container py-4 font-bold text-on-primary shadow-lg shadow-primary/10 transition-all duration-200 active:scale-[0.98] hover:brightness-110 disabled:opacity-60"
                   type="submit"
+                  disabled={loading}
                 >
-                  Sign In
+                  {loading ? "Signing in…" : "Sign In"}
                 </button>
                 <div className="flex justify-center">
-                  <button
+                  <Link
                     className="group flex space-x-2 text-sm font-medium text-on-surface-variant transition-colors duration-300 hover:text-on-surface"
-                    type="button"
+                    href="/auth/email"
                   >
                     <span className="material-symbols-outlined text-lg transition-transform group-hover:-translate-x-1">
                       arrow_back
                     </span>
                     <span>Back to email</span>
-                  </button>
+                  </Link>
                 </div>
               </div>
             </form>
@@ -145,7 +182,7 @@ export default function PasswordEntryPage() {
           </div>
         </div>
       </main>
-
     </div>
   );
 }
+
