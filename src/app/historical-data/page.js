@@ -215,10 +215,8 @@ export default function HistoricalDataPage() {
                         value={entry.type}
                         onChange={(e) => updateEntry(index, { type: e.target.value })}
                       >
-                        <option>Conceptual Research</option>
-                        <option>Problem-based Analysis</option>
-                        <option>Technical Implementation</option>
-                        <option>Administrative / Support</option>
+                        <option>Conceptual</option>
+                        <option>Problem-based</option>
                         <option>Other </option>
                       </select>
                     </div>
