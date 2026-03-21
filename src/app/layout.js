@@ -7,6 +7,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
+        // hi
         <link rel="icon" href="/appwrite.svg" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
