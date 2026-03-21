@@ -1,16 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import TopNavBar from "@/components/TopNavBar";
 import Footer from "@/components/Footer";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function EmailEntryPage() {
   const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Email submitted:", email);
-    // Handle email submission logic here
+    setError("");
+    setLoading(true);
+    // Store email in sessionStorage so the password page can read it
+    sessionStorage.setItem("auth_email", email);
+    router.push("/auth/password");
   };
 
   return (
@@ -40,6 +48,12 @@ export default function EmailEntryPage() {
               </span>
             </div>
 
+            {error && (
+              <div className="mb-4 rounded-lg bg-error-container/20 px-4 py-3 text-sm text-error">
+                {error}
+              </div>
+            )}
+
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="space-y-2">
                 <label
@@ -61,22 +75,23 @@ export default function EmailEntryPage() {
                 </div>
               </div>
               <button
-                className="w-full rounded-lg bg-gradient-to-br from-primary to-primary-container py-4 font-headline font-bold text-on-primary shadow-lg shadow-primary/10 transition-all duration-200 active:scale-[0.98] hover:brightness-110"
+                className="w-full rounded-lg bg-gradient-to-br from-primary to-primary-container py-4 font-headline font-bold text-on-primary shadow-lg shadow-primary/10 transition-all duration-200 active:scale-[0.98] hover:brightness-110 disabled:opacity-60"
                 type="submit"
+                disabled={loading}
               >
-                Continue
+                {loading ? "Loading…" : "Continue"}
               </button>
             </form>
 
             <div className="mt-8 border-t border-outline-variant/10 pt-8 text-center">
               <p className="text-sm text-on-surface-variant">
                 New to Estimately?
-                <a
+                <Link
                   className="ml-1 font-semibold text-on-secondary-container transition-colors duration-200 hover:text-secondary"
                   href="/auth/signup"
                 >
                   Sign up
-                </a>
+                </Link>
               </p>
             </div>
           </div>
@@ -96,3 +111,4 @@ export default function EmailEntryPage() {
     </div>
   );
 }
+

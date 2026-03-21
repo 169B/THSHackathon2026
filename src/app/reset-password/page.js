@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 export default function ResetPasswordPage() {
@@ -82,7 +83,7 @@ export default function ResetPasswordPage() {
               </form>
 
               <div className="flex flex-col items-center space-y-6 pt-4">
-                <a
+                <Link
                   className="inline-flex items-center gap-2 text-sm font-semibold text-on-secondary-container transition-colors duration-300 hover:text-secondary"
                   href="/"
                 >
@@ -90,7 +91,7 @@ export default function ResetPasswordPage() {
                     arrow_back
                   </span>
                   Back to sign in
-                </a>
+                </Link>
                 <div className="flex items-center gap-3 rounded-lg bg-surface-container-lowest/50 px-5 py-3">
                   <span
                     className="material-symbols-outlined text-lg text-secondary"
