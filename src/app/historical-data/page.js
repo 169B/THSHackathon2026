@@ -2,11 +2,21 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getCurrentUser, addTask, getCompletedTasks } from "@/lib/appwrite";
+
+// Map display types to backend task_type values
+const TYPE_MAP = {
+  "Conceptual Research": "writing",
+  "Problem-based Analysis": "problem",
+  "Technical Implementation": "problem",
+  "Administrative / Support": "writing",
+};
 
 function createEmptyEntry() {
   return {
     taskName: "",
-    courseProject: "",
+    courseProject: "other",
     type: "Conceptual Research",
     timeTaken: "",
     timeUnit: "Hours",
@@ -15,6 +25,7 @@ function createEmptyEntry() {
 }
 
 export default function HistoricalDataPage() {
+  const router = useRouter();
   const [taskCount, setTaskCount] = useState(3);
   const [entries, setEntries] = useState([
     createEmptyEntry(),
@@ -22,6 +33,15 @@ export default function HistoricalDataPage() {
     createEmptyEntry(),
   ]);
   const [savedCount, setSavedCount] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [existingTasks, setExistingTasks] = useState([]);
+
+  useEffect(() => {
+    getCurrentUser()
+      .then(() => getCompletedTasks())
+      .then(setExistingTasks)
+      .catch(() => router.replace("/"));
+  }, [router]);
 
   useEffect(() => {
     setEntries((prev) => {
@@ -38,10 +58,32 @@ export default function HistoricalDataPage() {
     setEntries((prev) => prev.map((entry, i) => (i === index ? { ...entry, ...patch } : entry)));
   };
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
-    console.log({ entries });
-    setSavedCount(entries.length);
+    setSaving(true);
+    let count = 0;
+    for (const entry of entries) {
+      if (!entry.taskName || !entry.timeTaken) continue;
+      const minutes = entry.timeUnit === "Hours" ? Math.round(Number(entry.timeTaken) * 60) : Number(entry.timeTaken);
+      await addTask({
+        title: entry.taskName,
+        description: "",
+        class_type: entry.courseProject,
+        task_type: TYPE_MAP[entry.type] || "writing",
+        difficulty: 3,
+        complexity: 3,
+        motivation: entry.motivation * 10,
+        estimated_length: minutes,
+        set_size: 0,
+        status: "done",
+        actual_time: minutes,
+        post_motivation: entry.motivation * 10,
+      });
+      count++;
+    }
+    setSavedCount(count);
+    setExistingTasks(await getCompletedTasks());
+    setSaving(false);
   };
 
   return (
@@ -145,14 +187,22 @@ export default function HistoricalDataPage() {
 
                       <div className="space-y-2">
                         <label className="text-xs uppercase tracking-widest font-semibold text-on-surface-variant ml-1">
-                          Class / Project
+                          Subject
                         </label>
-                        <input
-                          className="w-full bg-surface-container-highest border-none rounded-lg p-4 text-on-surface focus:ring-2 focus:ring-primary transition-all outline-none"
-                          type="text"
+                        <select
+                          className="w-full bg-surface-container-highest border-none rounded-lg p-4 text-on-surface focus:ring-2 focus:ring-primary transition-all outline-none appearance-none cursor-pointer"
                           value={entry.courseProject}
                           onChange={(e) => updateEntry(index, { courseProject: e.target.value })}
-                        />
+                        >
+                          <option value="math">Math</option>
+                          <option value="science">Science</option>
+                          <option value="english">English</option>
+                          <option value="history">History</option>
+                          <option value="cs">Computer Science</option>
+                          <option value="art">Art</option>
+                          <option value="language">Foreign Language</option>
+                          <option value="other">Other</option>
+                        </select>
                       </div>
                     </div>
 
@@ -225,10 +275,11 @@ export default function HistoricalDataPage() {
 
                 <div className="pt-6">
                   <button
-                    className="flex w-full items-center justify-center gap-4 rounded-xl bg-primary px-8 py-5 font-headline font-bold text-on-primary shadow-lg shadow-primary/15 transition-all duration-200 hover:brightness-105 active:scale-[0.98]"
+                    className="flex w-full items-center justify-center gap-4 rounded-xl bg-primary px-8 py-5 font-headline font-bold text-on-primary shadow-lg shadow-primary/15 transition-all duration-200 hover:brightness-105 active:scale-[0.98] disabled:opacity-50"
                     type="submit"
+                    disabled={saving}
                   >
-                    Save All Data Entries
+                    {saving ? "Saving..." : "Save All Data Entries"}
                   </button>
                   {savedCount > 0 ? (
                     <p className="text-xs text-primary mt-3 text-center">
@@ -239,6 +290,28 @@ export default function HistoricalDataPage() {
               </form>
             </div>
           </section>
+
+          {/* Existing Completed Tasks */}
+          {existingTasks.length > 0 && (
+            <section className="mb-24">
+              <h2 className="text-2xl font-headline font-bold text-on-surface mb-4">Previously Completed Tasks</h2>
+              <div className="space-y-3">
+                {existingTasks.map(t => (
+                  <div key={t.$id} className="bg-surface-container-low rounded-lg border border-outline-variant/10 p-4 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-sm text-on-surface">{t.title}</h4>
+                      <p className="text-[11px] text-on-surface-variant">
+                        <span className="capitalize">{t.class_type}</span>
+                        {t.actual_time > 0 && <span> · {t.actual_time}m actual</span>}
+                        {t.estimated_length > 0 && <span> · {t.estimated_length}m estimated</span>}
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-tertiary font-bold uppercase">Done</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </main>
       </div>
     </div>

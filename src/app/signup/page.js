@@ -1,16 +1,29 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { signup } from "@/lib/appwrite";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Sign up submitted:", { name, email, password });
+    setError("");
+    setLoading(true);
+    try {
+      await signup(email, password, name);
+      router.replace("/dashboard");
+    } catch (err) {
+      setError(err.message || "Failed to create account");
+    }
+    setLoading(false);
   };
 
   return (
@@ -106,11 +119,17 @@ export default function SignupPage() {
                 </div>
               </div>
 
+              {error && (
+                <div className="rounded-lg bg-error-container/20 border border-error/30 px-4 py-3 text-sm text-error">
+                  {error}
+                </div>
+              )}
               <button
-                className="w-full rounded-lg bg-gradient-to-br from-primary to-primary-container py-4 font-headline font-bold text-on-primary shadow-lg shadow-primary/10 transition-all duration-200 active:scale-[0.98] hover:brightness-110"
+                className="w-full rounded-lg bg-gradient-to-br from-primary to-primary-container py-4 font-headline font-bold text-on-primary shadow-lg shadow-primary/10 transition-all duration-200 active:scale-[0.98] hover:brightness-110 disabled:opacity-50"
                 type="submit"
+                disabled={loading}
               >
-                Create Account
+                {loading ? "Creating Account..." : "Create Account"}
               </button>
             </form>
 

@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  getCurrentUser, addTask, getCompletedTasks, predictTask, savePrediction,
+} from "@/lib/appwrite";
 
 function buildMonthDays(date) {
   const first = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -25,6 +28,20 @@ export default function TaskInputPage() {
   const [motivation, setMotivation] = useState(7);
   const [uploadedFileName, setUploadedFileName] = useState("");
 
+  // Backend-specific fields
+  const [classType, setClassType] = useState("other");
+  const [taskType, setTaskType] = useState("writing");
+  const [difficulty, setDifficulty] = useState(3);
+  const [complexity, setComplexity] = useState(3);
+  const [setSize, setSetSize] = useState(10);
+
+  // Rubric analysis state
+  const [rubricFile, setRubricFile] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [rubricResult, setRubricResult] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
   const dateInputRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -32,6 +49,11 @@ export default function TaskInputPage() {
   const monthName = monthDate.toLocaleString("en-US", { month: "long", year: "numeric" });
   const monthCells = useMemo(() => buildMonthDays(monthDate), [monthDate]);
   const selectedDay = deadline ? new Date(deadline).getDate() : null;
+
+  // Auth guard
+  useEffect(() => {
+    getCurrentUser().catch(() => router.replace("/"));
+  }, [router]);
 
   const onPickCalendar = () => {
     if (dateInputRef.current?.showPicker) {
@@ -48,11 +70,90 @@ export default function TaskInputPage() {
   const onFileChange = (event) => {
     const file = event.target.files?.[0];
     setUploadedFileName(file ? file.name : "");
+    setRubricFile(file || null);
   };
 
-  const onSubmit = (event) => {
+  const handleAnalyzeRubric = async () => {
+    if (!rubricFile) return;
+    setAnalyzing(true);
+    setError("");
+    try {
+      const form = new FormData();
+      form.append("file", rubricFile);
+      form.append("class_type", classType);
+      form.append("task_type", taskType);
+      const res = await fetch("/api/analyze-rubric", { method: "POST", body: form });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { throw new Error("Server returned invalid response"); }
+      if (data.error) throw new Error(data.error);
+      setRubricResult(data);
+      // Auto-fill from AI analysis
+      if (data.suggested_title) setTaskName(data.suggested_title);
+      if (data.summary) setDescription(data.summary);
+      if (data.complexity) setComplexity(data.complexity);
+      if (data.difficulty) setDifficulty(data.difficulty);
+      if (data.task_type_detected) setTaskType(data.task_type_detected);
+      if (data.set_size > 0) setSetSize(data.set_size);
+    } catch (err) {
+      setError(`Rubric analysis error: ${err.message}`);
+    }
+    setAnalyzing(false);
+  };
+
+  const onSubmit = async (event) => {
     event.preventDefault();
-    router.push("/analysis-output");
+    if (submitting) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      // Calculate days until due
+      const daysUntilDue = deadline
+        ? Math.max(1, Math.ceil((new Date(deadline) - new Date()) / (1000 * 60 * 60 * 24)))
+        : 7;
+
+      const taskData = {
+        title: taskName,
+        description,
+        class_type: classType,
+        task_type: taskType,
+        difficulty: parseInt(difficulty),
+        complexity: parseInt(complexity),
+        motivation: motivation * 10, // Convert 1-10 to 0-100
+        estimated_length: 0,
+        set_size: taskType === "problem" ? parseInt(setSize) || 0 : 0,
+      };
+
+      // Get AI estimate for avg person
+      const completed = await getCompletedTasks();
+      const aiRes = await fetch("/api/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: taskData, completedTasks: completed, mode: "ai" }),
+      }).then(r => r.json()).catch(() => null);
+
+      const avgEstimate = aiRes?.avg_person_minutes || 60;
+      taskData.estimated_length = avgEstimate;
+
+      // Save task
+      const newTask = await addTask(taskData);
+
+      // Run formula prediction
+      const formulaPred = await predictTask(newTask, daysUntilDue);
+      await savePrediction(newTask.$id, formulaPred);
+
+      // Store prediction for analysis-output page
+      const prediction = {
+        ...formulaPred,
+        taskTitle: taskName,
+        ai: aiRes && !aiRes.error ? aiRes : null,
+      };
+      sessionStorage.setItem("lastPrediction", JSON.stringify(prediction));
+      router.push("/analysis-output");
+    } catch (err) {
+      setError(`Error: ${err.message}`);
+    }
+    setSubmitting(false);
   };
 
   return (
@@ -141,9 +242,31 @@ export default function TaskInputPage() {
                   <span className="material-symbols-outlined text-sm">cloud_upload</span>
                   <span>Upload Rubric File</span>
                 </button>
-                <p className="text-xs text-on-surface-variant">
-                  {uploadedFileName ? `Uploaded: ${uploadedFileName}` : "No file selected"}
-                </p>
+                <div className="flex items-center gap-3">
+                  <p className="text-xs text-on-surface-variant">
+                    {uploadedFileName ? `Uploaded: ${uploadedFileName}` : "No file selected"}
+                  </p>
+                  {rubricFile && (
+                    <button
+                      className="px-3 py-1 bg-primary/20 text-primary text-xs font-bold rounded-lg hover:bg-primary/30 transition-all disabled:opacity-50"
+                      type="button"
+                      onClick={handleAnalyzeRubric}
+                      disabled={analyzing}
+                    >
+                      {analyzing ? "Analyzing..." : "Analyze"}
+                    </button>
+                  )}
+                </div>
+                {rubricResult && (
+                  <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 text-xs text-on-surface">
+                    <span className="font-bold text-primary">AI Analysis:</span> {rubricResult.summary}
+                    {rubricResult.key_requirements?.length > 0 && (
+                      <ul className="mt-1 ml-4 list-disc text-on-surface-variant">
+                        {rubricResult.key_requirements.map((r, i) => <li key={i}>{r}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-6">
@@ -162,13 +285,72 @@ export default function TaskInputPage() {
 
                 <div className="space-y-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-outline">
-                    Class / Project
+                    Subject
+                  </label>
+                  <select
+                    className="w-full bg-surface-container-highest border-0 focus:ring-2 focus:ring-primary text-on-surface rounded-lg px-4 py-3 transition-all outline-none appearance-none cursor-pointer"
+                    value={classType}
+                    onChange={(e) => setClassType(e.target.value)}
+                  >
+                    <option value="math">Math</option>
+                    <option value="science">Science</option>
+                    <option value="english">English</option>
+                    <option value="history">History</option>
+                    <option value="cs">Computer Science</option>
+                    <option value="art">Art</option>
+                    <option value="language">Foreign Language</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                    Task Type
+                  </label>
+                  <select
+                    className="w-full bg-surface-container-highest border-0 focus:ring-2 focus:ring-primary text-on-surface rounded-lg px-4 py-3 transition-all outline-none appearance-none cursor-pointer"
+                    value={taskType}
+                    onChange={(e) => setTaskType(e.target.value)}
+                  >
+                    <option value="writing">Writing</option>
+                    <option value="problem">Problem Set</option>
+                  </select>
+                </div>
+
+                {taskType === "problem" && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                      Set Size (# of problems)
+                    </label>
+                    <input
+                      className="w-full bg-surface-container-highest border-0 focus:ring-2 focus:ring-primary text-on-surface rounded-lg px-4 py-3 transition-all outline-none"
+                      type="number"
+                      value={setSize}
+                      onChange={(e) => setSetSize(e.target.value)}
+                      min={1}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                    Difficulty: {difficulty}/5
                   </label>
                   <input
-                    className="w-full bg-surface-container-highest border-0 focus:ring-2 focus:ring-primary text-on-surface rounded-lg px-4 py-3 transition-all outline-none"
-                    type="text"
-                    value={courseProject}
-                    onChange={(e) => setCourseProject(e.target.value)}
+                    className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
+                    type="range" min="1" max="5" value={difficulty}
+                    onChange={(e) => setDifficulty(Number(e.target.value))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-outline">
+                    Complexity: {complexity}/5
+                  </label>
+                  <input
+                    className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
+                    type="range" min="1" max="5" value={complexity}
+                    onChange={(e) => setComplexity(Number(e.target.value))}
                   />
                 </div>
 
@@ -237,11 +419,18 @@ export default function TaskInputPage() {
                 </div>
               </div>
 
+              {error && (
+                <div className="rounded-lg bg-error-container/20 border border-error/30 px-4 py-3 text-sm text-error">
+                  {error}
+                </div>
+              )}
+
               <button
-                className="flex w-full items-center justify-center gap-4 rounded-xl bg-primary px-8 py-5 font-headline font-bold text-on-primary shadow-lg shadow-primary/15 transition-all duration-200 hover:brightness-105 active:scale-[0.98]"
+                className="flex w-full items-center justify-center gap-4 rounded-xl bg-primary px-8 py-5 font-headline font-bold text-on-primary shadow-lg shadow-primary/15 transition-all duration-200 hover:brightness-105 active:scale-[0.98] disabled:opacity-50"
                 type="submit"
+                disabled={submitting}
               >
-                <span>Generate Prediction</span>
+                <span>{submitting ? "Generating..." : "Generate Prediction"}</span>
                 <span className="material-symbols-outlined font-bold">trending_flat</span>
               </button>
             </section>
@@ -291,7 +480,9 @@ export default function TaskInputPage() {
                   <p className="text-sm font-bold text-on-surface mb-2">Input Summary</p>
                   <div className="space-y-2 text-xs text-on-surface-variant">
                     <p>Task: {taskName || "--"}</p>
-                    <p>Class/Project: {courseProject || "--"}</p>
+                    <p>Subject: <span className="capitalize">{classType}</span></p>
+                    <p>Type: <span className="capitalize">{taskType}</span></p>
+                    <p>Difficulty: {difficulty}/5 · Complexity: {complexity}/5</p>
                     <p>Deadline: {deadline || "--"}</p>
                     <p>Motivation: {motivation}/10</p>
                   </div>

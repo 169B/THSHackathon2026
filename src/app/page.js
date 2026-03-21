@@ -1,13 +1,20 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { getCurrentUser } from "@/lib/appwrite";
 
 export default function EmailPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    getCurrentUser().then(() => router.replace("/dashboard")).catch(() => {});
+  }, [router]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log("Email submitted:", email);
+    router.push(`/password?email=${encodeURIComponent(email)}`);
   };
 
   return (

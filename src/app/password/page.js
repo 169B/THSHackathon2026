@@ -1,15 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { login } from "@/lib/appwrite";
+import { Suspense } from "react";
 
-export default function PasswordPage() {
+function PasswordForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [email] = useState("architect@temporal.com");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const email = searchParams.get("email") || "";
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Sign in with password:", password);
+    setError("");
+    setLoading(true);
+    try {
+      await login(email, password);
+      router.replace("/dashboard");
+    } catch (err) {
+      setError(err.message || "Invalid email or password");
+    }
+    setLoading(false);
   };
 
   return (
@@ -112,22 +127,28 @@ export default function PasswordPage() {
 
               {/* Actions */}
               <div className="space-y-6 pt-4">
+                {error && (
+                  <div className="rounded-lg bg-error-container/20 border border-error/30 px-4 py-3 text-sm text-error">
+                    {error}
+                  </div>
+                )}
                 <button
-                  className="w-full rounded-lg bg-gradient-to-br from-primary to-primary-container py-4 font-bold text-on-primary shadow-lg shadow-primary/10 transition-all duration-200 active:scale-[0.98] hover:brightness-110"
+                  className="w-full rounded-lg bg-gradient-to-br from-primary to-primary-container py-4 font-bold text-on-primary shadow-lg shadow-primary/10 transition-all duration-200 active:scale-[0.98] hover:brightness-110 disabled:opacity-50"
                   type="submit"
+                  disabled={loading}
                 >
-                  Sign In
+                  {loading ? "Signing in..." : "Sign In"}
                 </button>
                 <div className="flex justify-center">
-                  <button
+                  <a
                     className="group flex space-x-2 text-sm font-medium text-on-surface-variant transition-colors duration-300 hover:text-on-surface"
-                    type="button"
+                    href="/"
                   >
                     <span className="material-symbols-outlined text-lg transition-transform group-hover:-translate-x-1">
                       arrow_back
                     </span>
                     <span>Back to email</span>
-                  </button>
+                  </a>
                 </div>
               </div>
             </form>
@@ -144,5 +165,13 @@ export default function PasswordPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function PasswordPage() {
+  return (
+    <Suspense>
+      <PasswordForm />
+    </Suspense>
   );
 }
