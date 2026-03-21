@@ -313,7 +313,10 @@ export default function TaskInputPage() {
                     onChange={(e) => setTaskType(e.target.value)}
                   >
                     <option value="writing">Writing</option>
+                    <option value="reading">Reading</option>
                     <option value="problem">Problem Set</option>
+                    <option value="other">Other</option>
+
                   </select>
                 </div>
 
