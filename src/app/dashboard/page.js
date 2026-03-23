@@ -218,8 +218,8 @@ export default function Dashboard() {
               {calendarDays.map((day) => {
                 const isToday = day.toDateString() === todayStr;
                 const dayTasks = activeTasks.filter(t => {
-                  const created = new Date(t.$createdAt);
-                  return created.toDateString() === day.toDateString();
+                  if (!t.due_date) return false;
+                  return new Date(t.due_date).toDateString() === day.toDateString();
                 });
                 return (
                   <div key={day.toISOString()} className={`${isToday ? "bg-surface-container-high" : "bg-surface-container-low"} p-3 min-h-[120px] flex flex-col gap-2 relative overflow-hidden`}>

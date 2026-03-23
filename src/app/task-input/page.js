@@ -122,6 +122,7 @@ export default function TaskInputPage() {
         motivation: motivation * 10, // Convert 1-10 to 0-100
         estimated_length: 0,
         set_size: taskType === "problem" ? parseInt(setSize) || 0 : 0,
+        due_date: deadline ? new Date(deadline).toISOString() : null,
       };
 
       // Get AI estimate for avg person

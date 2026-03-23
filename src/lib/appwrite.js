@@ -88,14 +88,17 @@ export async function addTask({
   status = 'pending',
   actual_time = 0,
   post_motivation = 0,
+  due_date = null,
 }) {
   const userId = await getUserId();
-  return await databases.createDocument(DATABASE_ID, TASKS_COLLECTION_ID, ID.unique(), {
+  const doc = {
     userId,
     title, description, class_type, task_type,
     difficulty, complexity, motivation, estimated_length,
     set_size, status, actual_time, post_motivation,
-  });
+  };
+  if (due_date) doc.due_date = due_date;
+  return await databases.createDocument(DATABASE_ID, TASKS_COLLECTION_ID, ID.unique(), doc);
 }
 
 export async function getTasks() {
