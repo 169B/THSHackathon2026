@@ -19,7 +19,6 @@ export default function EmailPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* TopNavBar */}
       <header className="z-50 w-full bg-[#111411] font-['Manrope'] text-sm tracking-wide antialiased">
         <div className="flex w-full max-w-none items-center justify-between px-12 py-6">
           <div className="text-2xl font-bold tracking-tighter text-[#b4cdb8]">
@@ -28,21 +27,17 @@ export default function EmailPage() {
         </div>
       </header>
 
-      {/* Main Content Area */}
       <main className="relative flex flex-grow items-center justify-center overflow-hidden px-6">
-        {/* Organic Background Accents */}
         <div className="absolute top-1/4 -left-20 w-96 h-96 bg-primary/5 rounded-full blur-[100px]"></div>
         <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-secondary/5 rounded-full blur-[100px]"></div>
 
         <section className="z-10 w-full max-w-md">
-          {/* Asymmetric Editorial Intro */}
           <div className="mb-12 space-y-2">
             <h1 className="font-headline text-5xl font-extrabold tracking-tight text-on-surface">
               Enter your email
             </h1>
           </div>
 
-          {/* Focus Card */}
           <div className="relative rounded-xl border border-outline-variant/15 bg-surface-container-low p-8 shadow-2xl">
 
 
