@@ -8,6 +8,7 @@ import {
   getTasks, getCompletedTasks,
   updateTask, deleteTask,
 } from "@/lib/appwrite";
+import CanvasIntegration from "@/components/CanvasIntegration";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -337,6 +338,11 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
+          </section>
+
+          {/* Canvas LMS Integration */}
+          <section className="reveal reveal-delay-3">
+            <CanvasIntegration userId={user?.$id} />
           </section>
 
           {/* Post-Task Completion Modal */}
